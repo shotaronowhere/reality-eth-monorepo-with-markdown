@@ -7,7 +7,7 @@
       abi: RealityETH_ERC20_Factory
     mapping:
       kind: ethereum/events
-      apiVersion: 0.0.4
+      apiVersion: 0.0.6
       language: wasm/assemblyscript
       entities:
         - Directory
@@ -17,4 +17,4 @@
       eventHandlers:
         - event: RealityETH_ERC20_deployed(address,address,uint8,string)
           handler: handleFactoryRealityETHDeploy
-      file: ./src/mapping.ts
+      file: ./src/mapping_factory.ts

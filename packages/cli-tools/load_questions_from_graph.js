@@ -7,13 +7,23 @@ const rc_question = require('@reality.eth/reality-eth-lib/formatters/question.js
 const rc_template = require('@reality.eth/reality-eth-lib/formatters/template.js');
 const rc_contracts = require('@reality.eth/contracts');
 
-
+if(process.argv.length < 3) {
+    console.log('Usage: node load_questions_from_graph.js <chain_id> <offset|all> <num_per_fetch> <filter> <order>');
+}
 
 let chain_id = parseInt(process.argv[2]);
-let offset = parseInt(process.argv[3]);
+let offset;
+let do_fetch_all = false;
+if (process.argv[3] == 'all') {
+    offset = 0;
+    do_fetch_all = true;
+} else {
+    offset = parseInt(process.argv[3]);
+}
 let num_display = parseInt(process.argv[4]);
 let filter_str = process.argv[5];
 let order = process.argv[6];
+let no_ts = true;
 
 offset = offset ? offset : 0;
 num_display = num_display ? num_display : 1000;
@@ -29,7 +39,19 @@ for(const t in tokens) {
     }
 }
 
-fetchAndDisplayQuestionFromGraph(chain_info, offset, num_display, filter_str, order); 
+if (do_fetch_all) {
+    fetch_all();
+} else {
+    fetchAndDisplayQuestionFromGraph(chain_info, offset, num_display, filter_str, order); 
+}
+
+async function fetch_all() {
+    let some_left = true;
+    while(some_left) {
+        some_left = await fetchAndDisplayQuestionFromGraph(chain_info, offset, num_display, filter_str, order); 
+        offset = offset + num_display;    
+    }
+}
 
 async function fetchAndDisplayQuestionFromGraph(CHAIN_INFO, offset, num_display, filter_str, order) {
 
@@ -72,17 +94,20 @@ async function fetchAndDisplayQuestionFromGraph(CHAIN_INFO, offset, num_display,
       `;
     
 
-    console.log(query);
+    // console.log(query);
     const fetched_ms = Date.now();
 
-    console.log('sending graph query', query);
+    // console.log('sending graph query', query);
     const res = await axios.post(network_graph_url, {query: query});
     // console.log('graph res', res);
+    let found = false;
     for (const q of res.data.data.questions) {
+        found = true;
         handleQuestion(q, fetched_ms)
         // const question_posted = RCInstance(q.contract).filters.LogNewQuestion(q.questionId);
         // const result = await RCInstance(q.contract).queryFilter(question_posted, parseInt(q.createdBlock), parseInt(q.createdBlock));
     }
+    return found;
 }
 
 function handleQuestion(q, fetched_ms) {
@@ -114,7 +139,10 @@ function filledAnswer(item, fetched_ms) {
     // txid isn't filled from the graph, only from our unconfirmed transactions
     ans.txid = item.txid;
 
-    ans.fetched_ms = fetched_ms;
+    if (!no_ts) {
+        ans.fetched_ms = fetched_ms;
+    }
+
 
     return ans;
 
@@ -133,7 +161,10 @@ function filledQuestion(item, fetched_ms) {
     question.question_text= item.data;
     question.template_id = item.template.templateId;
     question.block_mined = item.createdBlock;
-    question.fetched_ms = fetched_ms;
+
+    if (!no_ts) {
+        question.fetched_ms = fetched_ms;
+    }
 
     if (item.openingTimestamp) {
         question.opening_ts = ethers.BigNumber.from(item.openingTimestamp);
